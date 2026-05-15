@@ -1,5 +1,5 @@
 from motor.motor_asyncio import AsyncIOMotorClient
-import certifi  # <-- NEW: Import the certificate library
+import certifi
 from app.core.config import settings
 
 class MongoDB:
@@ -8,19 +8,20 @@ class MongoDB:
 
 db_client = MongoDB()
 
+# ---------------------------------------------------------
+# THE VERCEL FIX: Initialize GLOBALLY, outside of any function
+# ---------------------------------------------------------
+print("Initializing MongoDB Client for Vercel...")
+db_client.client = AsyncIOMotorClient(
+    settings.MONGODB_URL, 
+    tlsCAFile=certifi.where()
+)
+db_client.db = db_client.client[settings.DATABASE_NAME]
+
+# Keep these empty functions so app/main.py doesn't crash when it calls them
 async def connect_to_mongo():
-    print("Connecting to MongoDB...")
-    
-    # NEW: Pass tlsCAFile=certifi.where() to force correct SSL verification
-    db_client.client = AsyncIOMotorClient(
-        settings.MONGODB_URL, 
-        tlsCAFile=certifi.where()
-    )
-    
-    db_client.db = db_client.client[settings.DATABASE_NAME]
-    print("Connected successfully.")
+    pass
 
 async def close_mongo_connection():
-    print("Closing MongoDB connection...")
     if db_client.client:
         db_client.client.close()
