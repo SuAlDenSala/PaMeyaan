@@ -3,7 +3,8 @@ uvicorn[standard]
 motor
 pydantic
 pydantic-settings
-passlib[bcrypt]
+passlib
+bcrypt==3.2.2
 python-jose[cryptography]
 python-multipart
 certifi
