@@ -27,3 +27,13 @@ class CommuterCreate(BaseModel):
 class ExternalAppCreate(BaseModel):
     app_name: str
     permissions: List[str]
+
+class DriverUpdate(BaseModel):
+    name: Optional[str] = None
+    franchise_number: Optional[str] = None
+    license_number: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class CommuterUpdate(BaseModel):
+    name: Optional[str] = None
+    discount_status: Optional[str] = None # e.g., "Regular",

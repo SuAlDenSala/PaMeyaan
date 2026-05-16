@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException, status
 from datetime import datetime
 from pydantic import BaseModel
 import uuid
-
+from app.models.schemas import DriverUpdate
+from fastapi import HTTPException
+from fastapi import Depends
+from app.core.security import get_current_admin
 from app.database.mongodb import db_client
 from app.models.domain import Driver
 from app.models.schemas import Token
@@ -84,3 +87,39 @@ async def login_driver(login_data: DriverLogin):
     })
     
     return {"access_token": access_token, "token_type": "bearer"}
+
+@router.put("/{driver_id}", response_model=dict)
+async def update_driver(
+    driver_id: str, 
+    update_data: DriverUpdate, 
+    current_admin: dict = Depends(get_current_admin)
+):
+    """(Admin Only) Update an existing driver's details."""
+    db = db_client.db
+    # Only update fields that were actually provided in the request
+    update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
+    
+    if not update_dict:
+        raise HTTPException(status_code=400, detail="No fields provided to update")
+
+    result = await db["drivers"].update_one({"_id": driver_id}, {"$set": update_dict})
+    
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Driver not found")
+        
+    return {"message": "Driver updated successfully"}
+
+
+@router.delete("/{driver_id}", response_model=dict)
+async def delete_driver(
+    driver_id: str, 
+    current_admin: dict = Depends(get_current_admin)
+):
+    """(Admin Only) Permanently delete a driver profile."""
+    db = db_client.db
+    result = await db["drivers"].delete_one({"_id": driver_id})
+    
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Driver not found")
+        
+    return {"message": "Driver deleted successfully"}
