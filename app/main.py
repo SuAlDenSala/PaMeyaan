@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
+from fastapi.middleware.cors import CORSMiddleware
 
 # Import all routers
 from app.routers import sync, driver, fare, auth, commuter , alerts, incidents
@@ -17,6 +18,14 @@ app = FastAPI(
     title=settings.PROJECT_NAME,
     description="Backend API Gateway for Unified Tricycle Transport",
     lifespan=lifespan
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 # Include all endpoints
