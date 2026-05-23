@@ -77,3 +77,28 @@ async def verify_external_app(api_key: str = Security(api_key_header)):
             detail="Invalid or revoked API Key",
         )
     return app_record 
+
+async def get_current_commuter(token: str = Depends(oauth2_scheme)):
+    """Verifies the JWT token and ensures the user is a logged-in Commuter."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials or you lack commuter permissions.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        email: str = payload.get("sub")
+        role: str = payload.get("role")
+        
+        # Security Check: Only allow Commuters
+        if email is None or role != "commuter":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    db = db_client.db
+    user = await db["commuters"].find_one({"email": email})
+    if user is None:
+        raise credentials_exception
+        
+    return user

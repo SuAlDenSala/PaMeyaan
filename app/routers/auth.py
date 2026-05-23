@@ -20,20 +20,14 @@ async def login_for_access_token(form_data: OAuth2PasswordRequestForm = Depends(
     admin_user = await db["admins"].find_one({"username": form_data.username})
     if admin_user and verify_password(form_data.password, admin_user["hashed_password"]):
         access_token = create_access_token(data={"sub": form_data.username, "role": "admin"})
-        return {"access_token": access_token, "token_type": "bearer"}
+        return {"access_token": access_token, "token_type": "bearer", "role": "admin"}
     
-    # 2. Check if Commuter
-    commuter_user = await db["commuters"].find_one({"email": form_data.username})
-    if commuter_user and verify_password(form_data.password, commuter_user["hashed_password"]):
-        access_token = create_access_token(data={"sub": form_data.username, "role": "commuter"})
-        return {"access_token": access_token, "token_type": "bearer"}
-    
+    # If it's not an admin, immediately fail the authentication
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Incorrect username/email or password",
+        detail="Incorrect username or password. Only LGU Admins are permitted to log in.",
         headers={"WWW-Authenticate": "Bearer"},
     )
-
 # CHANGED: Now a GET request that requires an active admin login session
 @router.get("/generate-api-key", status_code=status.HTTP_200_OK)
 async def generate_app_api_key(current_admin: dict = Depends(get_current_admin)):

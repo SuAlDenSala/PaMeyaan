@@ -15,6 +15,7 @@ class SyncPullResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    role: str  # <-- NEW: Tells the frontend what type of user just logged in
 
 # --- NEW SCHEMAS BELOW ---
 
@@ -33,6 +34,16 @@ class DriverUpdate(BaseModel):
     franchise_number: Optional[str] = None
     license_number: Optional[str] = None
     is_active: Optional[bool] = None
+
+class DriverSelfRegister(BaseModel):
+    name: Optional[str] = None
+    tricycle_body_number: str
+    photo_url: str
+
+class RatingCreate(BaseModel):
+    rating_score: int = Field(..., ge=1, le=5)
+    feedback: Optional[str] = None
+    is_flagged: bool = False
 
 class CommuterUpdate(BaseModel):
     name: Optional[str] = None

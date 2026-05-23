@@ -1,20 +1,27 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from datetime import datetime
 import uuid
-from fastapi import Depends
-from app.core.security import get_current_admin
-from app.models.schemas import CommuterUpdate
-from app.models.domain import Commuter
 
 from app.database.mongodb import db_client
 from app.models.domain import Commuter
-from app.models.schemas import CommuterCreate
-from app.core.security import get_current_admin, get_password_hash
+from app.models.schemas import CommuterCreate, CommuterUpdate, Token
+from app.core.security import (
+    get_current_admin, get_current_commuter, 
+    get_password_hash, verify_password, create_access_token
+)
 
 router = APIRouter(prefix="/commuters", tags=["Commuter Public Endpoints"])
 
+class CommuterLogin(BaseModel):
+    email: str
+    password: str
+
+# --- USER SIDE: LOGIN & SIGNUP ---
+
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def register_commuter(commuter_data: CommuterCreate):
+    """(Public) Commuter Signup."""
     db = db_client.db
     
     existing_user = await db["commuters"].find_one({"email": commuter_data.email})
@@ -22,7 +29,6 @@ async def register_commuter(commuter_data: CommuterCreate):
         raise HTTPException(status_code=400, detail="Email already registered")
 
     is_verified = True if commuter_data.discount_status == "Regular" else False
-
     commuter_id = str(uuid.uuid4())
     hashed_pwd = get_password_hash(commuter_data.password)
     
@@ -41,69 +47,49 @@ async def register_commuter(commuter_data: CommuterCreate):
     return {
         "status": "success",
         "message": f"Account created for {commuter_data.name}.",
-        "commuter_id": commuter_id,
-        "discount_status": commuter_data.discount_status,
-        "is_verified": is_verified
+        "commuter_id": commuter_id
     }
+
+@router.post("/login", response_model=Token)
+async def login_commuter(login_data: CommuterLogin):
+    """(Public) Commuter Login."""
+    db = db_client.db
+    user = await db["commuters"].find_one({"email": login_data.email})
+    
+    if not user or not verify_password(login_data.password, user["hashed_password"]):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
+        
+    access_token = create_access_token(data={"sub": user["email"], "role": "commuter"})
+    return {"access_token": access_token, "token_type": "bearer", "role": "commuter"}
+
+@router.get("/profile", response_model=Commuter)
+async def get_commuter_profile(current_commuter: dict = Depends(get_current_commuter)):
+    """(Commuter Only) Fetch my profile."""
+    return current_commuter
+
+# --- ADMIN SIDE: MANAGEMENT ---
 
 @router.get("/", response_model=list[Commuter])
 async def get_all_commuters(current_admin: dict = Depends(get_current_admin)):
-    """(Admin Only) Fetch all registered commuters."""
     db = db_client.db
     cursor = db["commuters"].find({})
     return await cursor.to_list(length=1000)
 
-
 @router.put("/{commuter_id}", response_model=dict)
-async def update_commuter(
-    commuter_id: str, 
-    update_data: CommuterUpdate, 
-    current_admin: dict = Depends(get_current_admin)
-):
-    """(Admin Only) Update commuter details (e.g., verifying PWD/Student status)."""
+async def update_commuter(commuter_id: str, update_data: CommuterUpdate, current_admin: dict = Depends(get_current_admin)):
     db = db_client.db
     update_dict = {k: v for k, v in update_data.model_dump().items() if v is not None}
-    
     if not update_dict:
-        raise HTTPException(status_code=400, detail="No fields provided to update")
-
+        raise HTTPException(status_code=400, detail="No fields to update")
     result = await db["commuters"].update_one({"_id": commuter_id}, {"$set": update_dict})
-    
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Commuter not found")
-        
-    return {"message": "Commuter updated successfully"}
-
+    return {"message": "Commuter updated"}
 
 @router.delete("/{commuter_id}", response_model=dict)
-async def delete_commuter(
-    commuter_id: str, 
-    current_admin: dict = Depends(get_current_admin)
-):
-    """(Admin Only) Delete a commuter account."""
+async def delete_commuter(commuter_id: str, current_admin: dict = Depends(get_current_admin)):
     db = db_client.db
     result = await db["commuters"].delete_one({"_id": commuter_id})
-    
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Commuter not found")
-        
-    return {"message": "Commuter deleted successfully"}
-
-router = APIRouter(prefix="/commuters", tags=["Commuter Public Endpoints"])
-
-@router.post(
-    "/register", 
-    response_model=dict, 
-    status_code=status.HTTP_201_CREATED,
-    summary="Register a new Commuter",
-    response_description="Returns the created commuter's ID and verification status"
-)
-async def register_commuter(commuter_data: CommuterCreate):
-    """
-    Creates a new commuter profile in the database.
-    
-    - **name**: Full name of the commuter.
-    - **email**: Unique email address.
-    - **password**: Will be securely hashed.
-    - **discount_status**: If "Regular", the account is automatically verified. Other statuses require LGU manual verification.
-    """
+    return {"message": "Commuter deleted"}

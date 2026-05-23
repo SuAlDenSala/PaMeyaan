@@ -1,14 +1,27 @@
 from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import List, Optional
 
 class Driver(BaseModel):
     id: str = Field(alias="_id")
     name: str
-    franchise_number: str
+    tricycle_body_number: str  # Replaces strict franchise requirement
+    photo_url: str             # URI for the uploaded selfie/profile pic
     qr_hash: str
+    community_trust_score: float = 0.0
+    total_ratings: int = 0
+    is_lgu_verified: bool = False # False means purely community-verified
     is_active: bool
     updated_at: datetime
 
+class CommuterRating(BaseModel):
+    id: str = Field(alias="_id")
+    driver_id: str
+    commuter_id: str
+    rating_score: int          # 1 to 5 stars
+    feedback: Optional[str] = None
+    is_flagged: bool           # True if reporting inappropriate behavior
+    timestamp: datetime
 class FareMatrix(BaseModel):
     id: str = Field(alias="_id")
     origin: str
