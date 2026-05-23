@@ -1,14 +1,23 @@
-from pydantic_settings import BaseSettings
+# app/core/config.py
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
+    # Non-sensitive defaults
     PROJECT_NAME: str = "eTODA Bongao API"
-    MONGODB_URL: str = "mongodb://localhost:27017"
-    DATABASE_NAME: str = "etoda_db"
-    SECRET_KEY: str = "super-secret-key-for-tcto-lgu"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
+    DATABASE_NAME: str = "etoda_db"
 
-    class Config:
-        env_file = ".env"
+    # Sensitive or environment-specific data (no defaults)
+    MONGODB_URL: str
+    SECRET_KEY: str
+    GATEWAY_INTERNAL_SECRET: str
+
+    # --- THE MODERN WAY (Pydantic V2) ---
+    model_config = SettingsConfigDict(
+        env_file=".env", 
+        env_file_encoding="utf-8",
+        extra="ignore" # Safely ignores extra variables in the .env file
+    )
 
 settings = Settings()

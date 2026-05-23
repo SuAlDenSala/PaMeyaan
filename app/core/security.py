@@ -3,7 +3,9 @@ from jose import jwt, JWTError  # <-- Added JWTError
 from datetime import datetime, timedelta
 from fastapi import Security, HTTPException, status, Depends  # <-- Added Depends
 from fastapi.security import APIKeyHeader, OAuth2PasswordBearer  # <-- Added OAuth2PasswordBearer
+from fastapi import Header  # <-- Added Header for internal gateway secret
 import hashlib
+
 
 from app.core.config import settings
 from app.database.mongodb import db_client
@@ -100,6 +102,13 @@ async def get_current_commuter(token: str = Depends(oauth2_scheme)):
     user = await db["commuters"].find_one({"email": email})
     if user is None:
         raise credentials_exception
-        
-    return 
+    
+async def verify_internal_gateway(x_internal_gateway_secret: str = Header(..., alias="X-Internal-Gateway-Secret")):
+    """Ensures only the Node.js Super App can hit the B2B endpoints."""
+    if x_internal_gateway_secret != settings.GATEWAY_INTERNAL_SECRET:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Invalid internal gateway secret"
+        )
+    return True
 

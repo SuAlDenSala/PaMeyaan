@@ -57,4 +57,14 @@ class CommuterCreate(BaseModel):
         default="Regular", 
         description="Discount category: 'Regular', 'Student', 'PWD', or 'Senior'", 
         example="Student"
+        
     )
+
+class SuperAppUserPayload(BaseModel):
+    tawiTawiUserId: str
+    email: str
+    fullName: str
+    
+class SuperAppRegisterPayload(SuperAppUserPayload):
+    # This captures extra data like Student/PWD sent during the handshake
+    discount_status: str = "Regular"
