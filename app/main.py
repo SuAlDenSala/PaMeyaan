@@ -7,6 +7,9 @@ from app.core.config import settings
 from app.database.mongodb import connect_to_mongo, close_mongo_connection
 from fastapi.middleware.cors import CORSMiddleware
 
+from fastapi import Depends
+from app.core.security import get_current_commuter
+
 # Added super_app to the imports
 from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app
 
@@ -65,6 +68,15 @@ app.include_router(incidents.router, prefix="/api")
 # --- NEW: Super App B2B Routes ---
 # Included without the /api prefix to match the Node.js service expectations exactly
 app.include_router(super_app.router)
+
+# Add this route near the bottom (above the root health check):
+@app.get("/api/test-sso", tags=["Super App B2B Integration"])
+async def test_single_sign_on(current_user: dict = Depends(get_current_commuter)):
+    """A simple route to test if the Node.js JWT is accepted by Python."""
+    return {
+        "message": "SSO Handshake Successful!",
+        "commuter_profile": current_user
+    }
 
 @app.get("/", tags=["Health Check"])
 async def root():

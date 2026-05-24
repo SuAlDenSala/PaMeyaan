@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     SECRET_KEY: str
     GATEWAY_INTERNAL_SECRET: str
 
+    SUPER_APP_JWKS_URI: str # Add this line
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
     # --- THE MODERN WAY (Pydantic V2) ---
     model_config = SettingsConfigDict(
         env_file=".env", 

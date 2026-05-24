@@ -16,6 +16,8 @@ from app.core.security import oauth2_scheme
 from app.models.domain import CommuterRating # Assuming you added this to domain.py
 from app.models.schemas import DriverSelfRegister, RatingCreate
 
+from app.core.security import get_current_admin, get_current_commuter # <-- Import the new function for dual-token auth
+
 router = APIRouter(prefix="/drivers", tags=["Driver Accounts & LGU Management"])
 
 class DriverCreate(BaseModel):
@@ -186,26 +188,14 @@ async def get_driver_profile(qr_hash: str):
 async def rate_driver(
     driver_id: str, 
     rating_data: RatingCreate, 
-    token: str = Depends(oauth2_scheme)
+    current_user: dict = Depends(get_current_commuter) # <-- Uses the correct function name!
 ):
     """(Commuter Only) Rate a driver and update their community trust score."""
     db = db_client.db
     
-    # 1. Verify Identity: Ensure only registered commuters can leave ratings
-    try:
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        commuter_email: str = payload.get("sub")
-        role: str = payload.get("role")
-        if role != "commuter":
-            raise HTTPException(status_code=403, detail="Only registered commuters can rate drivers.")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Invalid or expired session.")
-        
-    commuter = await db["commuters"].find_one({"email": commuter_email})
-    if not commuter:
-        raise HTTPException(status_code=404, detail="Commuter profile not found.")
-        
-    commuter_id = commuter["_id"]
+    # 1. Identity is automatically verified by the dual-token SSO dependency!
+    # current_user now holds the dictionary of the commuter from MongoDB
+    commuter_id = current_user["_id"]
 
     # 2. Abuse Prevention: Block spam rating (1 rating per driver per hour)
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
@@ -235,7 +225,7 @@ async def rate_driver(
     if not driver:
         raise HTTPException(status_code=404, detail="Driver not found.")
 
-    current_score = driver.get("communi7ty_trust_score", 0.0)
+    current_score = driver.get("community_trust_score", 0.0)
     total_ratings = driver.get("total_ratings", 0)
 
     new_total = total_ratings + 1
