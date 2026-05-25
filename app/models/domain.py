@@ -61,4 +61,21 @@ class ExternalApp(BaseModel):
     permissions: list     # e.g., ["read_fares", "read_alerts"]
     created_at: datetime
 
+class Driver(BaseModel):
+    id: str = Field(alias="_id")
+    name: str
+    
+    # Make these three fields Optional so both old LGU profiles 
+    # and new community profiles can coexist without crashing
+    franchise_number: Optional[str] = None      
+    tricycle_body_number: Optional[str] = None  
+    photo_url: Optional[str] = None             
+    
+    qr_hash: str
+    community_trust_score: float = 0.0
+    total_ratings: int = 0
+    is_lgu_verified: bool = False
+    is_active: bool
+    updated_at: datetime
+
     
