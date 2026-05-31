@@ -183,3 +183,30 @@ async def verify_internal_gateway(x_internal_gateway_secret: str = Header(..., a
             detail="Invalid internal gateway secret"
         )
     return True
+
+async def get_current_driver(token: str = Depends(oauth2_scheme)):
+    """Verifies the JWT token and ensures the user is a logged-in Driver."""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials or you lack driver permissions.",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        # Decode the token
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        franchise_number: str = payload.get("sub")
+        role: str = payload.get("role")
+        
+        # Security Check: Only allow Drivers
+        if franchise_number is None or role != "driver":
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+        
+    db = db_client.db
+    # Look up the driver by the franchise number saved in the token
+    user = await db["drivers"].find_one({"franchise_number": franchise_number})
+    if user is None:
+        raise credentials_exception
+        
+    return user

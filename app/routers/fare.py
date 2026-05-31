@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends, Query
 from datetime import datetime
 from pydantic import BaseModel
 import uuid
+import random
 
 from app.core.security import get_current_admin, get_current_commuter
 from app.database.mongodb import db_client
@@ -63,8 +64,6 @@ async def delete_fare(fare_id: str, current_admin: dict = Depends(get_current_ad
     return {"message": "Fare route deleted successfully"}
 
 
-# --- NEW ENDPOINT FOR THE MOBILE APP ---
-
 @router.get("/calculate")
 async def calculate_exact_fare(
     origin: str = Query(...), 
@@ -84,10 +83,8 @@ async def calculate_exact_fare(
     if not fare_route:
         raise HTTPException(status_code=404, detail="Route not found.")
         
-    # Check the commuter's profile status in the database
     commuter_status = current_commuter.get("discount_status", "Regular")
     
-    # Pick the exact amount based on their status
     if commuter_status == "Student":
         exact_amount = fare_route.get("student_fare")
     elif commuter_status == "Senior":
@@ -101,5 +98,55 @@ async def calculate_exact_fare(
         "origin": origin,
         "destination": destination,
         "passenger_status": commuter_status,
-        "exact_fare_php": exact_amount
+        "exact_fare_php": exact_amount,
+        "distance": f"{fare_route.get('distance_km', 0)} km"
     }
+
+
+# --- THE SEEDER SCRIPT ---
+
+@router.post("/seed-mock-fares")
+async def seed_all_combinations():
+    """TEMPORARY ROUTE: Instantly generates 1,980 mock fares for testing."""
+    db = db_client.db
+    
+    locations = [
+        'Bongao Port', 'Sanga-Sanga Airport', 'Tawi-Tawi Provincial Capitol', 'Bongao Municipal Hall',
+        'MSU-TCTO Campus', 'Mahardika Institute of Technology', 'Tawi-Tawi Regional Agricultural College',
+        'Abubakar Computer Learning Center', 'Bongao Central Elementary School', 'Datu Halun Pilot School',
+        'Brgy. Bongao Poblacion', 'Brgy. Ipil', 'Brgy. Kamagong', 'Brgy. Karungdong', 'Brgy. Lagasan',
+        'Brgy. Lakit Lakit', 'Brgy. Lamion', 'Brgy. Lapid Lapid', 'Brgy. Lato Lato', 'Brgy. Luuk Pandan',
+        'Brgy. Luuk Tulay', 'Brgy. Malassa', 'Brgy. Mandulan', 'Brgy. Masantong', 'Brgy. Montay Montay',
+        'Brgy. Nalil', 'Brgy. Pababag', 'Brgy. Pag-asa', 'Brgy. Pagasinan', 'Brgy. Pagatpat', 'Brgy. Pahut',
+        'Brgy. Pakias', 'Brgy. Paniongan', 'Brgy. Pasiagan', 'Brgy. Sanga-Sanga', 'Brgy. Silubog',
+        'Brgy. Simandagit', 'Brgy. Sumangat', 'Brgy. Tarawakan', 'Brgy. Tongsinah', 'Brgy. Tubig Basag',
+        'Brgy. Tubig Tanah', 'Brgy. Tubig-Boh', 'Brgy. Tubig-Mampallam', 'Brgy. Ungus-ungus'
+    ]
+    
+    fares_to_insert = []
+    
+    for origin in locations:
+        for dest in locations:
+            if origin == dest:
+                continue 
+                
+            distance = round(random.uniform(1.0, 15.0), 1)
+            regular = round(20 + (distance * 5), 2)
+            discounted = round(regular * 0.80, 2) 
+            
+            fares_to_insert.append({
+                "_id": str(uuid.uuid4()),
+                "origin": origin,
+                "destination": dest,
+                "regular_fare": regular,
+                "student_fare": discounted,
+                "senior_fare": discounted,
+                "pwd_fare": discounted,
+                "distance_km": distance,
+                "updated_at": datetime.utcnow()
+            })
+            
+    await db["fares"].delete_many({})
+    await db["fares"].insert_many(fares_to_insert)
+    
+    return {"message": f"Successfully generated {len(fares_to_insert)} routes!"}

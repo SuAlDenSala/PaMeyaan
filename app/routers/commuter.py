@@ -16,7 +16,43 @@ router = APIRouter(prefix="/commuters", tags=["Commuter Public Endpoints"])
 class CommuterLogin(BaseModel):
     email: str
     password: str
+class SyncDistancePayload(BaseModel):
+    commuter_id: str
+    total_distance_km: float
+    timestamp: str
 
+class CommuterUpdate(BaseModel):
+    name: str
+
+@router.post("/sync-distance", response_model=dict)
+async def sync_commuter_distance(payload: SyncDistancePayload, current_commuter: dict = Depends(get_current_commuter)):
+    """Receives offline distance calculations from the Flutter SyncService."""
+    db = db_client.db
+    
+    # Set the new absolute distance for the commuter
+    await db["commuters"].update_one(
+        {"_id": current_commuter["_id"]},
+        {"$set": {
+            "total_distance_km": payload.total_distance_km,
+            "last_calculated_at": payload.timestamp
+        }}
+    )
+    return {"message": "Distance synchronized successfully."}
+
+@router.put("/me/profile", response_model=dict)
+async def update_own_profile(update_data: CommuterUpdate, current_commuter: dict = Depends(get_current_commuter)):
+    """Allows a commuter to update their own display name."""
+    db = db_client.db
+    
+    if not update_data.name.strip():
+        raise HTTPException(status_code=400, detail="Name cannot be empty")
+        
+    await db["commuters"].update_one(
+        {"_id": current_commuter["_id"]}, 
+        {"$set": {"name": update_data.name.strip()}}
+    )
+    
+    return {"message": "Commuter profile updated successfully"}
 # --- USER SIDE: LOGIN & SIGNUP ---
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
