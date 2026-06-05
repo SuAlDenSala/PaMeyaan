@@ -60,6 +60,8 @@ class SuperAppUserPayload(BaseModel):
     tawiTawiUserId: str
     email: str
     fullName: str
+    role: Optional[str] = "commuter"       # <-- ADDED
+    franchise_number: Optional[str] = None # <-- ADDED
     
 class SuperAppRegisterPayload(SuperAppUserPayload):
     discount_status: str = "Regular"
