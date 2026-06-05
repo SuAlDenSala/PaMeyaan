@@ -2,15 +2,12 @@ from fastapi import APIRouter, HTTPException, status, Depends
 from datetime import datetime
 from pydantic import BaseModel
 import uuid
-
 from app.database.mongodb import db_client
 from app.models.domain import Driver
 from app.models.schemas import DriverUpdate, Token
 from app.services.qr_service import generate_driver_qr_hash
 from app.core.security import get_current_admin, create_access_token
-
 from datetime import timedelta
-from jose import jwt, JWTError
 from app.core.config import settings
 from app.core.security import oauth2_scheme
 from app.core.security import verify_password
@@ -44,6 +41,9 @@ class TripLogCreate(BaseModel):
     passengers_logged: int
     estimated_earnings: float
     timestamp: str
+# Add this schema if it isn't already in the file
+class FCMTokenPayload(BaseModel):
+    fcm_token: str
 
 @router.post("/sync-trips", response_model=dict)
 async def sync_driver_trips(payload: SyncTripsPayload, current_driver: dict = Depends(get_current_driver)):
@@ -64,6 +64,7 @@ async def sync_driver_trips(payload: SyncTripsPayload, current_driver: dict = De
     )
     
     return {"message": "Trips synchronized successfully."}
+
 @router.post("/signup", response_model=dict, status_code=status.HTTP_201_CREATED)
 async def public_driver_signup(driver_data: DriverCreate):
     """(Public) Driver self-registration. Pending LGU approval."""
@@ -82,6 +83,7 @@ async def public_driver_signup(driver_data: DriverCreate):
     new_driver = Driver(
         _id=driver_id,
         name=driver_data.name,
+        email=driver_data.email,  # <-- Save the email if provided
         franchise_number=driver_data.franchise_number,
         hashed_password=hashed_pw,  # 👇 SAVE IT TO MONGODB
         qr_hash=qr_hash,
@@ -139,7 +141,7 @@ async def update_own_profile(update_data: DriverUpdate, current_driver: dict = D
     )
     
     return {"message": "Profile updated successfully"}
-# --- ADMIN SIDE: LGU MANAGEMENT ENDPOINTS ---
+
 
 @router.post("/register", response_model=Driver, status_code=status.HTTP_201_CREATED)
 async def admin_register_driver(driver_data: DriverCreate, current_admin: dict = Depends(get_current_admin)):
@@ -155,6 +157,7 @@ async def admin_register_driver(driver_data: DriverCreate, current_admin: dict =
     new_driver = Driver(
         _id=driver_id,
         name=driver_data.name,
+        email=driver_data.email,  # <-- Save the email if provided
         franchise_number=driver_data.franchise_number,
         qr_hash=qr_hash,
         is_active=True, # Auto-approved since admin created it
@@ -210,6 +213,7 @@ async def self_register_driver(driver_data: DriverSelfRegister):
     new_driver = Driver(
         _id=driver_id,
         name=driver_data.name,
+        email=driver_data.email,  # <-- Save the email if provided
         tricycle_body_number=driver_data.tricycle_body_number,
         photo_url=driver_data.photo_url,
         qr_hash=qr_hash,
@@ -345,6 +349,10 @@ async def get_driver_trips(franchise_number: str):
     """Fetches the trip history and total earnings for a specific driver."""
     db = db_client.db
     
+    # 1. Fetch the driver's document from MongoDB to get their real profile name
+    driver_doc = await db["drivers"].find_one({"franchise_number": franchise_number})
+    driver_real_name = driver_doc.get("name", "Driver") if driver_doc else "Driver"
+
     # 1. Fetch all trips for this specific franchise number, sorted by newest first
     cursor = db["trips"].find({"franchise_number": franchise_number}).sort("timestamp", -1)
     trips = await cursor.to_list(length=100)
@@ -364,6 +372,22 @@ async def get_driver_trips(franchise_number: str):
         })
         
     return {
+        "driver_name": driver_real_name,
         "todays_earnings": total_earnings,
         "recent_trips": formatted_trips
     }
+@router.put("/me/fcm-token", response_model=dict)
+async def update_driver_fcm_token(
+    payload: FCMTokenPayload, 
+    current_driver: dict = Depends(get_current_driver) # Assuming you have this dependency
+):
+    """(Driver Only) Saves the device's Firebase notification token to the profile."""
+    db = db_client.db
+    
+    # Update the driver's document in MongoDB with their new device token
+    await db["drivers"].update_one(
+        {"_id": current_driver["_id"]},
+        {"$set": {"fcm_token": payload.fcm_token}}
+    )
+    
+    return {"message": "Driver FCM token saved successfully."}

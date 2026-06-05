@@ -11,7 +11,7 @@ from fastapi import Depends
 from app.core.security import get_current_commuter
 
 # Added super_app to the imports
-from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app
+from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app, routes, notifications
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -64,7 +64,8 @@ app.include_router(driver.router, prefix="/api")
 app.include_router(fare.router, prefix="/api")
 app.include_router(alerts.router, prefix="/api")
 app.include_router(incidents.router, prefix="/api")
-
+app.include_router(routes.router, prefix="/api")
+app.include_router(notifications.router, prefix="/api")
 # --- NEW: Super App B2B Routes ---
 # Included without the /api prefix to match the Node.js service expectations exactly
 app.include_router(super_app.router)

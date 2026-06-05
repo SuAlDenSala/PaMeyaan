@@ -22,3 +22,4 @@ Thumbs.db
 
 # Project Specific
 *.log
+firebase-service-account.json

@@ -23,6 +23,13 @@ class SyncDistancePayload(BaseModel):
 
 class CommuterUpdate(BaseModel):
     name: str
+class TripLogRequest(BaseModel):
+    franchise_number: str
+    origin: str
+    destination: str
+    fare: float
+class FCMTokenPayload(BaseModel):
+    fcm_token: str
 
 @router.post("/sync-distance", response_model=dict)
 async def sync_commuter_distance(payload: SyncDistancePayload, current_commuter: dict = Depends(get_current_commuter)):
@@ -129,3 +136,71 @@ async def delete_commuter(commuter_id: str, current_admin: dict = Depends(get_cu
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Commuter not found")
     return {"message": "Commuter deleted"}
+
+@router.post("/me/trips")
+async def log_new_trip(
+    trip_data: TripLogRequest, 
+    current_commuter: dict = Depends(get_current_commuter)
+):
+    """(Commuter Only) Log a new ride by providing the driver's franchise number."""
+    db = db_client.db
+    
+    # 1. Use the franchise number to look up the Driver's real name
+    driver = await db["drivers"].find_one({"franchise_number": trip_data.franchise_number})
+    
+    if not driver:
+        raise HTTPException(status_code=404, detail="Driver not found. Invalid QR code.")
+    
+    driver_full_name = driver.get("name", "Unknown Driver")
+
+    # 2. Create the Trip Record
+    new_trip = {
+        "_id": str(uuid.uuid4()),
+        "commuter_id": current_commuter["_id"],
+        "commuter_name": current_commuter.get("name", "Unknown"),
+        "driver_id": driver["_id"],
+        "driver_name": driver_full_name,
+        "franchise_number": trip_data.franchise_number,
+        "origin": trip_data.origin,
+        "destination": trip_data.destination,
+        "fare": trip_data.fare,
+        "timestamp": datetime.utcnow().isoformat(),
+        "status": "completed"
+    }
+    
+    # 3. Save to the commuter_trips collection (for the Commuter's History Tab)
+    await db["commuter_trips"].insert_one(new_trip)
+    
+    # 4. Save to the driver_trips collection (for the Driver's Earnings Tab)
+    await db["driver_trips"].insert_one(new_trip)
+
+    return {"message": "Trip logged successfully!", "driver_name": driver_full_name}
+
+@router.get("/me/trips")
+async def get_my_trips(current_commuter: dict = Depends(get_current_commuter)):
+    """(Commuter Only) Fetch all past trips for the logged-in commuter."""
+    db = db_client.db
+    
+    # Search for trips matching this commuter's ID, sorted by newest first
+    cursor = db["commuter_trips"].find({"commuter_id": current_commuter["_id"]}).sort("timestamp", -1)
+    
+    # Fetch up to their 50 most recent trips
+    trips = await cursor.to_list(length=50)
+    
+    return trips
+
+@router.put("/me/fcm-token", response_model=dict)
+async def update_commuter_fcm_token(
+    payload: FCMTokenPayload, 
+    current_commuter: dict = Depends(get_current_commuter)
+):
+    """(Commuter Only) Saves the device's Firebase notification token to the profile."""
+    db = db_client.db
+    
+    # Update the commuter's document in MongoDB with their new device token
+    await db["commuters"].update_one(
+        {"_id": current_commuter["_id"]},
+        {"$set": {"fcm_token": payload.fcm_token}}
+    )
+    
+    return {"message": "Commuter FCM token saved successfully."}

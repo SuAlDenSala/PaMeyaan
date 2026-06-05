@@ -32,17 +32,20 @@ class DriverUpdate(BaseModel):
     franchise_number: Optional[str] = None
     license_number: Optional[str] = None
     is_active: Optional[bool] = None
+    email: Optional[str] = None
 
 class DriverSelfRegister(BaseModel):
     name: Optional[str] = None
     tricycle_body_number: str
     photo_url: str
+    email: Optional[str] = None
 
 # 👇 THIS IS THE CORRECT DRIVER CREATE SCHEMA
 class DriverCreate(BaseModel):
     name: str
     franchise_number: str
     password: str
+    email: Optional[str] = None
 
 class RatingCreate(BaseModel):
     rating_score: int = Field(..., ge=1, le=5)

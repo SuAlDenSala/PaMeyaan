@@ -6,6 +6,7 @@ from typing import List, Optional
 class Driver(BaseModel):
     id: str = Field(alias="_id")
     name: str
+    email: Optional[str] = None
     hashed_password: Optional[str] = None
     franchise_number: Optional[str] = None   
     tricycle_body_number: Optional[str] = None  
