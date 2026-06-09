@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     # Non-sensitive defaults
-    PROJECT_NAME: str = "eTODA Bongao API"
+    PROJECT_NAME: str = "Pameyaan Bongao API"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 120
     DATABASE_NAME: str = "etoda_db"
