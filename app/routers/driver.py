@@ -227,7 +227,7 @@ async def self_register_driver(driver_data: DriverSelfRegister):
     await db["drivers"].insert_one(new_driver.model_dump(by_alias=True))
     
     return {
-        "message": "Self-registration successful. Welcome to eTODA!",
+        "message": "Self-registration successful. Welcome to Pameyaan!",
         "driver_id": driver_id,
         "qr_hash": qr_hash
     }

@@ -85,7 +85,7 @@ async def get_current_admin(token: str = Depends(oauth2_scheme)):
 async def get_current_commuter(token: str = Depends(oauth2_scheme)):
     """
     Verifies the JWT token and ensures the user is a logged-in Commuter.
-    Supports Dual-Token SSO: Accepts Native eTODA tokens AND Super App tokens.
+    Supports Dual-Token SSO: Accepts Native Pameyaan tokens AND Super App tokens.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
