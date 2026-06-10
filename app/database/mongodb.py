@@ -11,7 +11,7 @@ db_client = MongoDB()
 # ---------------------------------------------------------
 # THE VERCEL FIX: Initialize GLOBALLY, outside of any function
 # ---------------------------------------------------------
-print("Initializing MongoDB Client for Vercel...")
+print("Initializing MongoDB Client for Render...")
 db_client.client = AsyncIOMotorClient(
     settings.MONGODB_URL, 
     tlsCAFile=certifi.where()
