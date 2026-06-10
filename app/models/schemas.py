@@ -18,6 +18,7 @@ class Token(BaseModel):
     role: str
     qr_hash: Optional[str] = None # <-- ADD THIS so the Driver app can generate the real QR
     franchise_number: Optional[str] = None
+    name: Optional[str] = None
 
 class CommuterCreate(BaseModel):
     name: str = Field(..., description="The commuter's full name", example="Juan Dela Cruz")

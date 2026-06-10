@@ -16,6 +16,7 @@ router = APIRouter(prefix="/commuters", tags=["Commuter Public Endpoints"])
 class CommuterLogin(BaseModel):
     email: str
     password: str
+
 class SyncDistancePayload(BaseModel):
     commuter_id: str
     total_distance_km: float
@@ -23,11 +24,13 @@ class SyncDistancePayload(BaseModel):
 
 class CommuterUpdate(BaseModel):
     name: str
+
 class TripLogRequest(BaseModel):
     franchise_number: str
     origin: str
     destination: str
     fare: float
+
 class FCMTokenPayload(BaseModel):
     fcm_token: str
 
@@ -60,6 +63,7 @@ async def update_own_profile(update_data: CommuterUpdate, current_commuter: dict
     )
     
     return {"message": "Commuter profile updated successfully"}
+
 # --- USER SIDE: LOGIN & SIGNUP ---
 
 @router.post("/register", response_model=dict, status_code=status.HTTP_201_CREATED)
@@ -95,7 +99,6 @@ async def register_commuter(commuter_data: CommuterCreate):
 
 @router.post("/login", response_model=Token)
 async def login_commuter(login_data: CommuterLogin):
-    """(Public) Commuter Login."""
     db = db_client.db
     user = await db["commuters"].find_one({"email": login_data.email})
     
@@ -103,7 +106,14 @@ async def login_commuter(login_data: CommuterLogin):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect email or password")
         
     access_token = create_access_token(data={"sub": user["email"], "role": "commuter"})
-    return {"access_token": access_token, "token_type": "bearer", "role": "commuter"}
+    
+    # 👇 FIX: Return the name so Flutter can cache it for the UI
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer", 
+        "role": "commuter",
+        "name": user.get("name") # Add this line!
+    }
 
 @router.get("/profile", response_model=Commuter)
 async def get_commuter_profile(current_commuter: dict = Depends(get_current_commuter)):
@@ -137,25 +147,35 @@ async def delete_commuter(commuter_id: str, current_admin: dict = Depends(get_cu
         raise HTTPException(status_code=404, detail="Commuter not found")
     return {"message": "Commuter deleted"}
 
-@router.post("/me/trips")
+# --- TRIP LOGGING (UPDATED AND FIXED MECHANISM) ---
+
+@router.post("/me/trips", status_code=status.HTTP_201_CREATED)
 async def log_new_trip(
     trip_data: TripLogRequest, 
     current_commuter: dict = Depends(get_current_commuter)
 ):
-    """(Commuter Only) Log a new ride by providing the driver's franchise number."""
+    """(Commuter Only) Log a new ride securely after verification scanning."""
     db = db_client.db
     
-    # 1. Use the franchise number to look up the Driver's real name
-    driver = await db["drivers"].find_one({"franchise_number": trip_data.franchise_number})
+    # 👇 FIX: Flexible $or lookup framework to fetch driver by either schema field entry
+    driver = await db["drivers"].find_one({
+        "$or": [
+            {"franchise_number": trip_data.franchise_number},
+            {"tricycle_body_number": trip_data.franchise_number}
+        ]
+    })
     
     if not driver:
-        raise HTTPException(status_code=404, detail="Driver not found. Invalid QR code.")
+        raise HTTPException(status_code=404, detail="Driver profile not found in matching records.")
     
     driver_full_name = driver.get("name", "Unknown Driver")
 
-    # 2. Create the Trip Record
+    # Generate uniform record values for full cross-tab compatibility
+    now = datetime.utcnow()
+    trip_id = str(uuid.uuid4())
+
     new_trip = {
-        "_id": str(uuid.uuid4()),
+        "_id": trip_id,
         "commuter_id": current_commuter["_id"],
         "commuter_name": current_commuter.get("name", "Unknown"),
         "driver_id": driver["_id"],
@@ -164,17 +184,20 @@ async def log_new_trip(
         "origin": trip_data.origin,
         "destination": trip_data.destination,
         "fare": trip_data.fare,
-        "timestamp": datetime.utcnow().isoformat(),
-        "status": "completed"
+        "status": "Completed",
+        "timestamp": now.isoformat(),
+        "date": now.strftime("%b %d, %Y") # Added explicitly to render smoothly on frontend cards
     }
     
-    # 3. Save to the commuter_trips collection (for the Commuter's History Tab)
+    # Save synchronously across structural metrics paths
     await db["commuter_trips"].insert_one(new_trip)
-    
-    # 4. Save to the driver_trips collection (for the Driver's Earnings Tab)
     await db["driver_trips"].insert_one(new_trip)
 
-    return {"message": "Trip logged successfully!", "driver_name": driver_full_name}
+    return {
+        "message": "Trip logged successfully!", 
+        "driver_name": driver_full_name,
+        "trip": new_trip
+    }
 
 @router.get("/me/trips")
 async def get_my_trips(current_commuter: dict = Depends(get_current_commuter)):

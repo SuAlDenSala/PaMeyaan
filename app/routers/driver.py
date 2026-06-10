@@ -100,7 +100,8 @@ async def login_driver(login_data: DriverLogin):
         "token_type": "bearer", 
         "role": "driver",
         "qr_hash": driver.get("qr_hash"),
-        "franchise_number": driver.get("franchise_number")
+        "franchise_number": driver.get("franchise_number"),
+        "name": driver.get("name")
     }
 
 @router.put("/me/profile", response_model=dict)

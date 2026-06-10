@@ -42,7 +42,7 @@ app = FastAPI(
     """,
     version="1.0.0",
     contact={
-        "name": "LGU IT Department",
+        "name": "LGU IT ent",
         "email": "admin@bongao.gov.ph",
     },
     openapi_tags=tags_metadata,
