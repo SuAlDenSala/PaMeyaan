@@ -347,9 +347,43 @@ async def get_driver_trips(franchise_number: str):
         
     return {
         "driver_name": driver_real_name,
+        "community_trust_score": driver_doc.get("community_trust_score", 0.0) if driver_doc else 0.0,
+        "total_ratings": driver_doc.get("total_ratings", 0) if driver_doc else 0,
         "todays_earnings": total_earnings,
         "recent_trips": formatted_trips
     }
+
+@router.get("/me/ratings")
+async def get_my_ratings(current_driver: dict = Depends(get_current_driver)):
+    """(Driver Only) Fetch all text reviews and ratings given to this driver."""
+    db = db_client.db
+    
+    # Fetch all ratings for this specific driver, sorted by newest first
+    # We filter out ratings that have absolutely no review_text so the UI stays clean
+    cursor = db["driver_ratings"].find(
+        {
+            "driver_id": current_driver["_id"], 
+            "review_text": {"$exists": True, "$ne": "", "$ne": None}
+        }
+    ).sort("created_at", -1)
+    
+    ratings = await cursor.to_list(length=50) # Grab the 50 most recent
+    
+    # Format the data cleanly for Flutter
+    formatted_ratings = []
+    for r in ratings:
+        # Safely handle the date formatting
+        created_at = r.get("created_at", datetime.utcnow())
+        date_str = created_at.strftime("%b %d, %Y") if isinstance(created_at, datetime) else "Recent"
+        
+        formatted_ratings.append({
+            "id": r.get("_id"),
+            "rating_value": r.get("rating_value", 0),
+            "review_text": r.get("review_text", ""),
+            "date": date_str
+        })
+        
+    return formatted_ratings
 
 @router.put("/me/fcm-token", response_model=dict)
 async def update_driver_fcm_token(

@@ -55,6 +55,12 @@ class RatingCreate(BaseModel):
     feedback: Optional[str] = None
     is_flagged: bool = False
 
+class RatingSubmit(BaseModel):
+    driver_id: str = Field(..., description="The ID of the driver being rated")
+    commuter_id: str = Field(..., description="The ID of the commuter submitting the rating")
+    rating_value: int = Field(..., ge=1, le=5, description="Rating from 1 to 5")
+    review_text: Optional[str] = Field(None, description="Optional text review")
+
 class CommuterUpdate(BaseModel):
     name: Optional[str] = None
     discount_status: Optional[str] = None

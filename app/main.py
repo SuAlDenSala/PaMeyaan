@@ -11,7 +11,7 @@ from fastapi import Depends
 from app.core.security import get_current_commuter
 
 # Added super_app to the imports
-from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app, routes, notifications
+from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app, routes, notifications, ratings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -66,6 +66,7 @@ app.include_router(alerts.router, prefix="/api")
 app.include_router(incidents.router, prefix="/api")
 app.include_router(routes.router, prefix="/api")
 app.include_router(notifications.router, prefix="/api")
+app.include_router(ratings.router)
 # --- NEW: Super App B2B Routes ---
 # Included without the /api prefix to match the Node.js service expectations exactly
 app.include_router(super_app.router)
@@ -85,4 +86,4 @@ async def root():
     return FileResponse("static/index.html")
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=2111, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=2005, reload=True)
