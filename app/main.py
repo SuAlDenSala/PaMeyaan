@@ -8,7 +8,7 @@ from app.database.mongodb import connect_to_mongo, close_mongo_connection
 from fastapi.middleware.cors import CORSMiddleware
 
 from fastapi import Depends
-from app.core.security import get_current_commuter
+from app.core.security import get_current_commuter, get_current_driver
 
 # Added super_app to the imports
 from app.routers import auth, commuter, sync, driver, fare, alerts, incidents, super_app, routes, notifications, ratings
@@ -71,15 +71,23 @@ app.include_router(ratings.router)
 # Included without the /api prefix to match the Node.js service expectations exactly
 app.include_router(super_app.router)
 
-# Add this route near the bottom (above the root health check):
+# Add these routes near the bottom (above the root health check):
+
 @app.get("/api/test-sso", tags=["Super App B2B Integration"])
 async def test_single_sign_on(current_user: dict = Depends(get_current_commuter)):
-    """A simple route to test if the Node.js JWT is accepted by Python."""
+    """A simple route to test if the Node.js JWT is accepted by Python for Commuters."""
     return {
         "message": "SSO Handshake Successful!",
         "commuter_profile": current_user
     }
 
+@app.get("/api/test-sso-driver", tags=["Super App B2B Integration"])
+async def test_driver_single_sign_on(current_driver: dict = Depends(get_current_driver)):
+    """A simple route to test if the Node.js JWT is accepted by Python for Drivers."""
+    return {
+        "message": "Driver SSO Handshake Successful!",
+        "driver_profile": current_driver
+    }
 @app.get("/", tags=["Health Check"])
 async def root():
     # Serve the HTML frontend dashboard instead of the JSON message
